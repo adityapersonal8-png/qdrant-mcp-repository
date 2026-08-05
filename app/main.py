@@ -1,23 +1,34 @@
 import os
 import secrets
-from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer
 from fastmcp import FastMCP
 from app.mcp_server import mcp
 
-# 1. Initialize the FastAPI Web Application
-app = FastAPI(title="Qdrant Secure MCP Gateway")
-
-# Read credentials safely out of Render's Environment panel
+# 1. SETUP CREDENTIALS AND PERMANENT TOKEN CONTAINER
 RENDER_CLIENT_ID = os.getenv("CLIENT_ID", "pega-mcp-client")
 RENDER_CLIENT_SECRET = os.getenv("CLIENT_SECRET", "change-me-in-production")
 
-# A simple in-memory store for active tokens
-ACTIVE_TOKENS = {}
+# A set tracks active valid tokens permanently in-memory
+ACTIVE_TOKENS = set()
 
-# 2. EXPOSE THE OAUTH 2.0 TOKEN ENDPOINT FOR PEGA
-@app.post("/oauth/token")
+# 2. BEARER TOKEN AUTHENTICATION CHECK (NO EXPIRY CHECK)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="oauth/token")
+
+async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
+    """Validates that the token exists in our permanent security block."""
+    if token not in ACTIVE_TOKENS:
+        raise HTTPException(status_code=401, detail="Invalid access token.")
+    return token
+
+# 3. INITIALIZE THE FASTAPI APP WITH GLOBAL AUTHENTICATION
+app = FastAPI(
+    title="Qdrant Secure MCP Gateway",
+    dependencies=[Depends(verify_mcp_access_token)]
+)
+
+# 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
+@app.post("/oauth/token", dependencies=[])
 async def generate_token(
     grant_type: str = Form(...),
     client_id: str = Form(...),
@@ -34,33 +45,21 @@ async def generate_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Generate a unique string token
     access_token = secrets.token_hex(32)
-    expiry = datetime.utcnow() + timedelta(hours=1)
-    ACTIVE_TOKENS[access_token] = expiry
+    
+    # Save it permanently to our active memory set
+    ACTIVE_TOKENS.add(access_token)
     
     return {
         "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": 3600
+        "token_type": "bearer"
     }
 
-# 3. BEARER TOKEN AUTHENTICATION CHECK
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="oauth/token")
-
-async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
-    """Interceptors that validate the incoming token passed from Pega."""
-    if token not in ACTIVE_TOKENS:
-        raise HTTPException(status_code=401, detail="Invalid access token.")
-        
-    if datetime.utcnow() > ACTIVE_TOKENS[token]:
-        del ACTIVE_TOKENS[token]
-        raise HTTPException(status_code=401, detail="Token has expired.")
-    return token
-
-@app.get("/")
+@app.get("/", dependencies=[])
 async def root():
-    return {"status": "active", "auth": "OAuth 2.0 Protected"}
+    """Simple public health check route."""
+    return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
 
-# 4. CORRECT MOUNT METHOD
-# This securely protects your MCP endpoints using your token validation logic automatically
-mcp_asgi = FastMCP.from_fastapi(app, dependencies=[Depends(verify_mcp_access_token)])
+# 5. CLEAN MOUNT METHOD FOR INTEGRATION
+mcp_asgi = FastMCP.from_fastapi(app)

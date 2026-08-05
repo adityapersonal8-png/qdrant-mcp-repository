@@ -64,7 +64,7 @@ secured_router = APIRouter(dependencies=[Depends(verify_mcp_access_token)])
 app.include_router(secured_router)
 
 # Build the HTTP sub-app instance from your imported mcp tools
-mcp_engine = mcp.http_app()
+mcp_engine = mcp.http_app(path="/")
 
 # Mount the operational tool engine under the protected sub-route
 app.mount("/mcp", mcp_engine)

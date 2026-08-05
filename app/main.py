@@ -48,9 +48,9 @@ async def generate_token(
         "token_type": "bearer"
     }
 
-# 5. INTEGRATE THE IMPORTED MCP SERVER ENGINE WITH FASTAPI
-# We pass our FastAPI instance to handle_fastapi to register the routes
-mcp.handle_fastapi(app)
+# 5. REGISTER FASTMCP ROUTES TO FASTAPI VIA SSE HANDLER
+# This injects the tool endpoints natively under your security block
+mcp.handle_sse(app)
 
 # 6. PUBLIC HEALTH CHECK ROUTE
 @app.get("/")

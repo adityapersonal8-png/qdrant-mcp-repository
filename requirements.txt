@@ -1,5 +1,5 @@
 fastapi
 uvicorn
-mcp[cli]
+mcp[cli]>=0.1.0
 qdrant-client
 fastembed

@@ -63,4 +63,6 @@ async def root():
 
 # 5. CLEAN MOUNT METHOD FOR INTEGRATION
 # Calling handle_fastapi directly on your imported mcp instance instead of the class
-mcp_asgi = mcp.handle_fastapi(app)
+# mcp_asgi = mcp.handle_fastapi(app)
+# CHANGE THE VERY LAST LINE TO THIS:
+mcp_asgi = mcp.http_app()

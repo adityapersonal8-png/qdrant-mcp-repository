@@ -62,5 +62,5 @@ async def root():
     return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
 
 # 5. CLEAN MOUNT METHOD FOR INTEGRATION
-# Using the correct FastMCP utility function to register with your FastAPI app instance
-mcp_asgi = FastMCP.handle_fastapi(app)
+# Calling handle_fastapi directly on your imported mcp instance instead of the class
+mcp_asgi = mcp.handle_fastapi(app)

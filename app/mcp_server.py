@@ -1,14 +1,13 @@
 import os
 import uuid
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from qdrant_client import QdrantClient
 
 # 1. Initialize the FastMCP Server
 mcp = FastMCP("Qdrant Rule Metadata Server")
 
 # 2. Initialize Qdrant Client (Uses Render Environment Variables)
-# Falls back to local defaults if environment variables aren't set yet
-qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+qdrant_url = os.getenv("QDRANT_URL", "https://qdrant.io")
 qdrant_api_key = os.getenv("QDRANT_API_KEY", None)
 
 qdrant_client = QdrantClient(
@@ -18,19 +17,23 @@ qdrant_client = QdrantClient(
 
 def generate_deterministic_uuid(key_string: str) -> str:
     """Generates a consistent, valid Qdrant UUID from a unique text key (like pzInsKey)."""
-    # Uses Namespace DNS to ensure the same text string always yields the same UUID
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, key_string))
 
 @mcp.tool()
-async def store_rule_metadata(collection_name: str, pz_ins_key: str, rule_text: str, metadata: dict) -> str:
+async def store_rule_metadata(
+    pz_ins_key: str, 
+    rule_text: str, 
+    metadata: dict,
+    collection_name: str = "pega_application_knowledge"
+) -> str:
     """
     Store rule text, auto-generate its embedding vector, and save application metadata to Qdrant.
     
     Args:
-        collection_name: The target Qdrant collection name.
         pz_ins_key: The unique string identifier of the rule (e.g. pzInsKey).
         rule_text: The actual body or text representation of the rule to embed.
         metadata: A dictionary containing rule context (e.g. application name, version).
+        collection_name: The target Qdrant collection name (Defaults to pega_application_knowledge).
     """
     try:
         # Generate a clean, repeatable ID from the rule key string
@@ -46,20 +49,24 @@ async def store_rule_metadata(collection_name: str, pz_ins_key: str, rule_text: 
             metadata=[payload],
             ids=[deterministic_id]
         )
-        return f"Successfully stored rule. Generated ID: {deterministic_id}"
+        return f"Successfully stored rule in '{collection_name}'. Generated ID: {deterministic_id}"
         
     except Exception as e:
         return f"Storage operation failed: {str(e)}"
 
 @mcp.tool()
-async def search_rule_metadata(collection_name: str, query: str, limit: int = 5) -> list:
+async def search_rule_metadata(
+    query: str, 
+    limit: int = 5,
+    collection_name: str = "pega_application_knowledge"
+) -> list:
     """
     Perform a global semantic vector search across application rule metadata.
     
     Args:
-        collection_name: The Qdrant collection to query.
         query: The natural language search terms or description of the rule functionality.
         limit: Maximum number of relevant results to return (default is 5).
+        collection_name: The Qdrant collection to query (Defaults to pega_application_knowledge).
     """
     try:
         # Client query natively generates the vector for your string input and runs search

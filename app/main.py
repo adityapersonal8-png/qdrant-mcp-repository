@@ -25,7 +25,10 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
 app = FastAPI(
     #title="Qdrant Secure MCP Gateway",
     #dependencies=[Depends(verify_mcp_access_token)]
-    app = FastAPI(title="Qdrant Secure MCP Gateway")
+   # app = FastAPI(title="Qdrant Secure MCP Gateway")
+    # Change Line 26 to exactly this:
+app = FastAPI(title="Qdrant Secure MCP Gateway")
+
 )
 
 # 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
@@ -67,4 +70,7 @@ async def root():
 # mcp_asgi = mcp.handle_fastapi(app)
 # CHANGE THE VERY LAST LINE TO THIS:
 # mcp_asgi = mcp.http_app()
-mcp_asgi = mcp.http_app(dependencies=[Depends(verify_mcp_access_token)])
+# mcp_asgi = mcp.http_app(dependencies=[Depends(verify_mcp_access_token)])
+# Replace Line 70 at the very bottom with these two lines:
+mcp_engine = mcp.http_app()
+app.mount("/mcp", mcp_engine, dependencies=[Depends(verify_mcp_access_token)])

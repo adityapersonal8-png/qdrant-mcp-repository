@@ -63,4 +63,9 @@ async def root():
     return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
 
 # 5. CLEAN MOUNT METHOD FOR INTEGRATION
-mcp_asgi = FastMCP.from_fastapi(app)
+# mcp_asgi = FastMCP.from_fastapi(app)
+# Create your FastMCP instance
+mcp_server = FastMCP("Qdrant Secure MCP Gateway")
+
+# Mount your authenticated FastAPI app directly into FastMCP
+mcp_server.mount(app)

@@ -23,12 +23,8 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
 
 # 3. INITIALIZE THE FASTAPI APP WITH GLOBAL AUTHENTICATION
 app = FastAPI(
-    #title="Qdrant Secure MCP Gateway",
-    #dependencies=[Depends(verify_mcp_access_token)]
-   # app = FastAPI(title="Qdrant Secure MCP Gateway")
-    # Change Line 26 to exactly this:
-app = FastAPI(title="Qdrant Secure MCP Gateway")
-
+    title="Qdrant Secure MCP Gateway",
+    dependencies=[Depends(verify_mcp_access_token)]
 )
 
 # 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
@@ -66,11 +62,6 @@ async def root():
     return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
 
 # 5. CLEAN MOUNT METHOD FOR INTEGRATION
-# Calling handle_fastapi directly on your imported mcp instance instead of the class
-# mcp_asgi = mcp.handle_fastapi(app)
-# CHANGE THE VERY LAST LINE TO THIS:
-# mcp_asgi = mcp.http_app()
-# mcp_asgi = mcp.http_app(dependencies=[Depends(verify_mcp_access_token)])
-# Replace Line 70 at the very bottom with these two lines:
+# Removed the invalid dependencies argument to satisfy Starlette's mount rules
 mcp_engine = mcp.http_app()
-app.mount("/mcp", mcp_engine, dependencies=[Depends(verify_mcp_access_token)])
+app.mount("/mcp", mcp_engine)

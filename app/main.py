@@ -3,7 +3,6 @@ import secrets
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer
 from fastmcp import FastMCP
-from app.mcp_server import mcp
 
 # 1. SETUP CREDENTIALS AND PERMANENT TOKEN CONTAINER
 RENDER_CLIENT_ID = os.getenv("CLIENT_ID", "pega-mcp-client")
@@ -21,15 +20,14 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid access token.")
     return token
 
-# 3. INITIALIZE THE FASTAPI APP WITH GLOBAL AUTHENTICATION
-app = FastAPI(
-    title="Qdrant Secure MCP Gateway",
-  #  dependencies=[Depends(verify_mcp_access_token)]
-    app = FastAPI(title="Qdrant Secure MCP Gateway")
-)
+# 3. INITIALIZE THE FASTAPI APP (NO Global master lock here)
+app = FastAPI(title="Qdrant Secure MCP Gateway")
 
-# 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
-@app.post("/oauth/token", dependencies=[])
+# 4. INITIALIZE THE FASTMCP SERVER INSTANCE
+mcp = FastMCP("Qdrant Secure MCP Gateway")
+
+# 5. OAUTH 2.0 TOKEN GENERATION ROUTE (Public)
+@app.post("/oauth/token")
 async def generate_token(
     grant_type: str = Form(...),
     client_id: str = Form(...),
@@ -48,8 +46,6 @@ async def generate_token(
     
     # Generate a unique string token
     access_token = secrets.token_hex(32)
-    
-    # Save it permanently to our active memory set
     ACTIVE_TOKENS.add(access_token)
     
     return {
@@ -57,15 +53,13 @@ async def generate_token(
         "token_type": "bearer"
     }
 
-@app.get("/", dependencies=[])
+# 6. SECURED OPERATIONAL ENDPOINTS FOR PEGA
+# This mounts the FastMCP server onto your FastAPI application under a dedicated path,
+# protecting all underlying Qdrant tools using your security dependency barrier.
+app.mount("/mcp", mcp.as_asgi(), dependencies=[Depends(verify_mcp_access_token)])
+
+# 7. PUBLIC HEALTH CHECK ROUTE
+@app.get("/")
 async def root():
     """Simple public health check route."""
-    return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
-
-# 5. CLEAN MOUNT METHOD FOR INTEGRATION
-# mcp_asgi = FastMCP.from_fastapi(app)
-# Create your FastMCP instance
-mcp_server = FastMCP("Qdrant Secure MCP Gateway")
-
-# Mount your authenticated FastAPI app directly into FastMCP
-mcp_server.mount(app)
+    return {"status": "active", "auth": "OAuth 2.0 Enabled", "mcp_endpoint": "/mcp"}

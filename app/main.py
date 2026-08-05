@@ -3,7 +3,7 @@ import secrets
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer
 
-# IMPORT YOUR SERVER FROM MCP_SERVER.PY
+# IMPORT YOUR SERVER INSTANCE FROM YOUR MCP_SERVER.PY FILE
 from app.mcp_server import mcp
 
 # 1. SETUP CREDENTIALS AND PERMANENT TOKEN CONTAINER
@@ -48,11 +48,11 @@ async def generate_token(
         "token_type": "bearer"
     }
 
-# 5. REGISTER FASTMCP ROUTES TO FASTAPI VIA SSE HANDLER
-# This injects the tool endpoints natively under your security block
-mcp.handle_sse(app)
+# 5. MOUNT THE IMPORTED FASTMCP ROUTER NATIVELY AS AN ASGI APP
+# FastMCP instances natively behave as ASGI sub-apps when passed to mount()
+app.mount("/mcp", mcp, dependencies=[Depends(verify_mcp_access_token)])
 
 # 6. PUBLIC HEALTH CHECK ROUTE
 @app.get("/")
 async def root():
-    return {"status": "active", "auth": "OAuth 2.0 Enabled"}
+    return {"status": "active", "auth": "OAuth 2.0 Enabled", "mcp_endpoint": "/mcp"}

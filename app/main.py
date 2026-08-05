@@ -16,4 +16,5 @@ async def root():
     }
 
 # Connect your MCP server tools to the FastAPI web layer via SSE
-mcp.handle_fastapi(app, path="/mcp")
+# Paste this correct line instead:
+mcp.handle_sse(app, route="/mcp")

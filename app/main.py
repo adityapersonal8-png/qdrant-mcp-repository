@@ -23,8 +23,9 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
 
 # 3. INITIALIZE THE FASTAPI APP WITH GLOBAL AUTHENTICATION
 app = FastAPI(
-    title="Qdrant Secure MCP Gateway",
-    dependencies=[Depends(verify_mcp_access_token)]
+    #title="Qdrant Secure MCP Gateway",
+    #dependencies=[Depends(verify_mcp_access_token)]
+    app = FastAPI(title="Qdrant Secure MCP Gateway")
 )
 
 # 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
@@ -65,4 +66,5 @@ async def root():
 # Calling handle_fastapi directly on your imported mcp instance instead of the class
 # mcp_asgi = mcp.handle_fastapi(app)
 # CHANGE THE VERY LAST LINE TO THIS:
-mcp_asgi = mcp.http_app()
+# mcp_asgi = mcp.http_app()
+mcp_asgi = mcp.http_app(dependencies=[Depends(verify_mcp_access_token)])

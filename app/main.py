@@ -1,6 +1,6 @@
 import os
 import secrets
-from fastapi import FastAPI, Depends, HTTPException, status, Form
+from fastapi import FastAPI, Depends, HTTPException, status, Form, APIRouter
 from fastapi.security import OAuth2PasswordBearer
 from fastmcp import FastMCP
 from app.mcp_server import mcp
@@ -21,11 +21,8 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid access token.")
     return token
 
-# 3. INITIALIZE THE FASTAPI APP WITH GLOBAL AUTHENTICATION
-app = FastAPI(
-    title="Qdrant Secure MCP Gateway",
-    dependencies=[Depends(verify_mcp_access_token)]
-)
+# 3. INITIALIZE THE FASTAPI APP WITHOUT THE GLOBAL LOCK
+app = FastAPI(title="Qdrant Secure MCP Gateway")
 
 # 4. OVERRIDE THE TOKEN GENERATION ROUTE TO BYPASS AUTH
 @app.post("/oauth/token", dependencies=[])
@@ -61,7 +58,13 @@ async def root():
     """Simple public health check route."""
     return {"status": "active", "auth": "OAuth 2.0 Enabled (Permanent Tokens)"}
 
-# 5. CLEAN MOUNT METHOD FOR INTEGRATION
-# Removed the invalid dependencies argument to satisfy Starlette's mount rules
+# 5. CREATE A PROTECTED SUB-ROUTER AND MOUNT THE MCP ENGINE
+# This creates a secured route segment that enforces your token validation logic
+secured_router = APIRouter(dependencies=[Depends(verify_mcp_access_token)])
+app.include_router(secured_router)
+
+# Build the HTTP sub-app instance from your imported mcp tools
 mcp_engine = mcp.http_app()
+
+# Mount the operational tool engine under the protected sub-route
 app.mount("/mcp", mcp_engine)

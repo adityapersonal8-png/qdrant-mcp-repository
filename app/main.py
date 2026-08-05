@@ -3,19 +3,20 @@ import secrets
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.responses import JSONResponse
+from fastmcp import FastMCP
 from app.mcp_server import mcp
 
+# 1. Initialize the FastAPI Web Application
 app = FastAPI(title="Qdrant Secure MCP Gateway")
 
 # Read credentials safely out of Render's Environment panel
 RENDER_CLIENT_ID = os.getenv("CLIENT_ID", "pega-mcp-client")
 RENDER_CLIENT_SECRET = os.getenv("CLIENT_SECRET", "change-me-in-production")
 
-# A simple in-memory store for active tokens (wipes clean if server restarts)
+# A simple in-memory store for active tokens
 ACTIVE_TOKENS = {}
 
-# 1. EXPOSE THE OAUTH 2.0 TOKEN ENDPOINT FOR PEGA
+# 2. EXPOSE THE OAUTH 2.0 TOKEN ENDPOINT FOR PEGA
 @app.post("/oauth/token")
 async def generate_token(
     grant_type: str = Form(...),
@@ -33,10 +34,7 @@ async def generate_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Generate a secure random token string
     access_token = secrets.token_hex(32)
-    
-    # Set the token to expire in 1 hour
     expiry = datetime.utcnow() + timedelta(hours=1)
     ACTIVE_TOKENS[access_token] = expiry
     
@@ -46,7 +44,7 @@ async def generate_token(
         "expires_in": 3600
     }
 
-# 2. BEARER TOKEN AUTHENTICATION CHECK
+# 3. BEARER TOKEN AUTHENTICATION CHECK
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="oauth/token")
 
 async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
@@ -55,7 +53,7 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid access token.")
         
     if datetime.utcnow() > ACTIVE_TOKENS[token]:
-        del ACTIVE_TOKENS[token] # Clean up expired token
+        del ACTIVE_TOKENS[token]
         raise HTTPException(status_code=401, detail="Token has expired.")
     return token
 
@@ -63,12 +61,6 @@ async def verify_mcp_access_token(token: str = Depends(oauth2_scheme)):
 async def root():
     return {"status": "active", "auth": "OAuth 2.0 Protected"}
 
-# 3. MOUNT THE MCP SSE ROUTE
-# This securely intercepts traffic on /mcp, verifies the token, then forwards to your Qdrant tools
-@app.get("/mcp")
-@app.post("/mcp")
-async def handle_mcp_endpoint(token: str = Depends(verify_mcp_access_token)):
-    # Wraps the ASGI application setup cleanly for your tools
-    from fastmcp import FastMCP
-    asgi_app = FastMCP.from_fastapi(app)
-    return await asgi_app(scope, receive, send)
+# 4. CORRECT MOUNT METHOD
+# This securely protects your MCP endpoints using your token validation logic automatically
+mcp_asgi = FastMCP.from_fastapi(app, dependencies=[Depends(verify_mcp_access_token)])
